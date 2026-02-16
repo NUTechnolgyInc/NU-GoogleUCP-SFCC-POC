@@ -1,0 +1,4 @@
+python test_guest_registered_flows.py                           # Run both
+python test_guest_registered_flows.py --mode guest              # Guest only
+python test_guest_registered_flows.py --mode registered --email vijey.anbarasan@nulogic.io  # Registered only
+python test_guest_registered_flows.py --mode registered --otp 123456  # Pre-provide OTP
