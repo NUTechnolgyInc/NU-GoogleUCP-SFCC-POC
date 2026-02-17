@@ -37,6 +37,7 @@ except ImportError:
 
 from dotenv import load_dotenv
 from starlette.applications import Starlette
+from starlette.responses import JSONResponse
 from starlette.responses import FileResponse
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
@@ -49,10 +50,10 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
-logging.getLogger("google").setLevel(logging.DEBUG)
-logging.getLogger("google_genai").setLevel(logging.DEBUG)
-logging.getLogger("google_adk").setLevel(logging.DEBUG)
-logging.getLogger("httpx").setLevel(logging.DEBUG)
+logging.getLogger("google").setLevel(logging.WARNING)
+logging.getLogger("google_genai").setLevel(logging.WARNING)
+logging.getLogger("google_adk").setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 def create_app():
     """Create and configure the Starlette application."""
@@ -84,11 +85,11 @@ def create_app():
         [
             Route(
                 "/",
-                lambda _: json.dumps({"status": "ok", "message": "Business Agent is running"}),
+                lambda request: JSONResponse({"status": "ok", "message": "Business Agent is running"}),
             ),
             Route(
                 "/.well-known/ucp",
-                lambda _: FileResponse(base_path / "data" / "ucp.json"),
+                lambda request: FileResponse(base_path / "data" / "ucp.json"),
             ),
             Mount(
                 "/images",
