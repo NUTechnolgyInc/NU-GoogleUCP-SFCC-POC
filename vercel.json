@@ -1,19 +1,5 @@
 {
     "version": 2,
-    "name": "nu-googleucp-sfcc-poc",
-    "builds": [
-        {
-            "src": "apps/chat-client/package.json",
-            "use": "@vercel/static-build",
-            "config": {
-                "distDir": "dist"
-            }
-        },
-        {
-            "src": "api/index.py",
-            "use": "@vercel/python"
-        }
-    ],
     "rewrites": [
         {
             "source": "/api",
@@ -25,9 +11,10 @@
         },
         {
             "source": "/(.*)",
-            "destination": "/apps/chat-client/$1"
+            "destination": "/$1"
         }
     ],
+    "outputDirectory": "apps/chat-client/dist",
     "env": {
         "USE_SCAPI": "true"
     }
