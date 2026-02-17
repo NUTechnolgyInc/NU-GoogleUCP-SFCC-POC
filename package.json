@@ -6,7 +6,7 @@
         "rest/nodejs"
     ],
     "scripts": {
-        "build": "npm run build -w apps/chat-client && cp -r apps/chat-client/dist ./dist",
+        "build": "npm run build -w apps/chat-client && rm -rf public && mv apps/chat-client/dist public",
         "dev": "npm run dev -w apps/chat-client"
     }
 }
