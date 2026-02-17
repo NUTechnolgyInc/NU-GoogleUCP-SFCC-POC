@@ -1,5 +1,10 @@
 {
     "version": 2,
+    "functions": {
+        "api/index.py": {
+            "includeFiles": "apps/business_agent/**"
+        }
+    },
     "rewrites": [
         {
             "source": "/api",
@@ -11,7 +16,7 @@
         },
         {
             "source": "/(.*)",
-            "destination": "/$1"
+            "destination": "/index.html"
         }
     ],
     "outputDirectory": "dist",
