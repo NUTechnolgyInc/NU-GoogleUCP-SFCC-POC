@@ -4,5 +4,9 @@
     "workspaces": [
         "apps/chat-client",
         "rest/nodejs"
-    ]
+    ],
+    "scripts": {
+        "build": "npm run build -w apps/chat-client",
+        "dev": "npm run dev -w apps/chat-client"
+    }
 }

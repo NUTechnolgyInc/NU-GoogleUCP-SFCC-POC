@@ -88,6 +88,10 @@ def create_app():
                 lambda request: JSONResponse({"status": "ok", "message": "Business Agent is running"}),
             ),
             Route(
+                "/api",
+                lambda request: JSONResponse({"status": "ok", "message": "Business Agent is running (at /api)"}),
+            ),
+            Route(
                 "/.well-known/ucp",
                 lambda request: FileResponse(base_path / "data" / "ucp.json"),
             ),
@@ -102,6 +106,7 @@ def create_app():
 
 # Expose app for Vercel
 app = create_app()
+
 
 def make_sync(func):
     """Wrap an async function to run synchronously."""
