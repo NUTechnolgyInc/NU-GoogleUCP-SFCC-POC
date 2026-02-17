@@ -19,6 +19,7 @@ import functools
 import json
 import logging
 import os
+import sys
 
 from pathlib import Path
 from a2a.server.apps import A2AStarletteApplication
@@ -40,51 +41,18 @@ load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-logger.addHandler(logging.StreamHandler())
-logging.getLogger("google").setLevel(logging.DEBUG)
-logging.getLogger("google_genai").setLevel(logging.DEBUG)
-logging.getLogger("google_adk").setLevel(logging.DEBUG)
-logging.getLogger("httpx").setLevel(logging.DEBUG)
 
-
-def make_sync(func):
-    """Wrap an async function to run synchronously.
-
-    Args:
-        func: The async function to wrap.
-
-
-    Returns:
-        The wrapped synchronous function.
-
-
-    """
-
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        return asyncio.run(func(*args, **kwargs))
-
-    return wrapper
-
-
-@click.command()
-@click.option("--host", default="localhost")
-@click.option("--port", default=10999)
-@make_sync
-async def run(host, port):
-    """Run the A2A business agent server.
-
-    Args:
-        host: The host to bind to.
-        port: The port to listen on.
-
-    """
-    if not os.getenv("GOOGLE_API_KEY"):
-        logger.error("GOOGLE_API_KEY must be set")
-        exit(1)
-
+def create_app():
+    """Create and configure the Starlette application."""
     base_path = Path(__file__).parent
     card_path = base_path / "data" / "agent_card.json"
+    
+    if not card_path.exists():
+        logger.error(f"Agent card not found at {card_path}")
+        # Fallback for Vercel deployment structure if needed
+        # base_path = Path("/var/task/a2a/business_agent/src/business_agent")
+        # card_path = base_path / "data" / "agent_card.json"
+    
     with card_path.open(encoding="utf-8") as f:
         data = json.load(f)
     agent_card = AgentCard.model_validate(data)
@@ -116,12 +84,31 @@ async def run(host, port):
             ),
         ]
     )
-    app = Starlette(routes=routes)
+    return Starlette(routes=routes)
+
+# Expose app for Vercel
+app = create_app()
+
+def make_sync(func):
+    """Wrap an async function to run synchronously."""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        return asyncio.run(func(*args, **kwargs))
+    return wrapper
+
+@click.command()
+@click.option("--host", default="0.0.0.0")
+@click.option("--port", default=10999)
+@make_sync
+async def run(host, port):
+    """Run the A2A business agent server locally."""
+    if not os.getenv("GOOGLE_API_KEY"):
+        logger.error("GOOGLE_API_KEY must be set")
+        exit(1)
 
     config = uvicorn.Config(app, host=host, port=port, log_level="info")
     server = uvicorn.Server(config)
     await server.serve()
 
-
 if __name__ == "__main__":
-  run()
+    run()
