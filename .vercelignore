@@ -1,0 +1,13 @@
+node_modules
+apps/chat-client/node_modules
+rest/nodejs/node_modules
+apps/business_agent/node_modules
+.venv
+venv
+env
+__pycache__
+.git
+dist
+public
+path/to/venv
+apps/business_agent/path/to/venv
