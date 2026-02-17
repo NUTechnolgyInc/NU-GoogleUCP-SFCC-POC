@@ -2,6 +2,10 @@
     "version": 2,
     "rewrites": [
         {
+            "source": "/.well-known/ucp",
+            "destination": "https://business-agent-178484567461.us-central1.run.app/.well-known/ucp"
+        },
+        {
             "source": "/api/(.*)",
             "destination": "https://business-agent-178484567461.us-central1.run.app/$1"
         },
