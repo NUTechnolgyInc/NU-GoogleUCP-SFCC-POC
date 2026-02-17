@@ -14,6 +14,9 @@
 
 """UCP."""
 
+from dotenv import load_dotenv
+load_dotenv()
+
 import asyncio
 import functools
 import json
@@ -35,7 +38,6 @@ except ImportError:
     uvicorn = None
     click = None
 
-from dotenv import load_dotenv
 from starlette.applications import Starlette
 from starlette.responses import JSONResponse
 from starlette.responses import FileResponse
@@ -44,8 +46,6 @@ from starlette.staticfiles import StaticFiles
 
 from .agent import root_agent as business_agent
 from .agent_executor import ADKAgentExecutor
-
-load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

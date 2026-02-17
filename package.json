@@ -2,7 +2,7 @@
     "name": "nu-googleucp-sfcc-poc-root",
     "private": true,
     "workspaces": [
-        "a2a/chat-client",
+        "apps/chat-client",
         "rest/nodejs"
     ]
 }
