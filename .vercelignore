@@ -11,3 +11,4 @@ dist
 public
 path/to/venv
 apps/business_agent/path/to/venv
+api/
