@@ -1,5 +1,5 @@
-pydantic[email]<2.13.0
-google-adk[a2a]>=1.22.0
+pydantic<2.13.0
+google-adk>=1.22.0
 httpx<0.29.0
 ucp-sdk==0.1.0
 python-dotenv<1.1.0
