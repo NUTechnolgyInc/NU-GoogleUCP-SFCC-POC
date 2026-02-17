@@ -79,6 +79,10 @@ def create_app():
     routes.extend(
         [
             Route(
+                "/",
+                lambda _: json.dumps({"status": "ok", "message": "Business Agent is running"}),
+            ),
+            Route(
                 "/.well-known/ucp",
                 lambda _: FileResponse(base_path / "data" / "ucp.json"),
             ),
