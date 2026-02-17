@@ -1,43 +1,16 @@
 {
     "version": 2,
     "name": "nu-googleucp-sfcc-poc",
-    "builds": [
-        {
-            "src": "a2a/chat-client/package.json",
-            "use": "@vercel/static-build",
-            "config": {
-                "distDir": "dist"
-            }
-        },
-        {
-            "src": "rest/nodejs/src/index.ts",
-            "use": "@vercel/node"
-        },
-        {
-            "src": "a2a/business_agent/src/business_agent/main.py",
-            "use": "@vercel/python"
-        }
-    ],
+    "buildCommand": "cd a2a/chat-client && npm install && npm run build",
+    "outputDirectory": "a2a/chat-client/dist",
     "rewrites": [
         {
             "source": "/api",
-            "destination": "/a2a/business_agent/src/business_agent/main.py"
+            "destination": "/api/index.py"
         },
         {
             "source": "/api/(.*)",
-            "destination": "/a2a/business_agent/src/business_agent/main.py"
-        },
-        {
-            "source": "/rest/node",
-            "destination": "/rest/nodejs/src/index.ts"
-        },
-        {
-            "source": "/rest/node/(.*)",
-            "destination": "/rest/nodejs/src/index.ts"
-        },
-        {
-            "source": "/(.*)",
-            "destination": "/a2a/chat-client/$1"
+            "destination": "/api/index.py"
         }
     ],
     "env": {
