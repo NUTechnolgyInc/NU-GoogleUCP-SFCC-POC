@@ -41,6 +41,11 @@ load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+logger.addHandler(logging.StreamHandler())
+logging.getLogger("google").setLevel(logging.DEBUG)
+logging.getLogger("google_genai").setLevel(logging.DEBUG)
+logging.getLogger("google_adk").setLevel(logging.DEBUG)
+logging.getLogger("httpx").setLevel(logging.DEBUG)
 
 def create_app():
     """Create and configure the Starlette application."""
