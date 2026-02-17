@@ -293,7 +293,7 @@ function App() {
         'Content-Type': 'application/json',
         'X-A2A-Extensions':
           'https://ucp.dev/specification/reference?v=2026-01-11',
-        'UCP-Agent': `profile="${window.location.origin}/.well-known/ucp"`,
+        'UCP-Agent': 'profile="https://business-agent-178484567461.us-central1.run.app/.well-known/ucp"',
       };
 
       const response = await fetch('/api', {
