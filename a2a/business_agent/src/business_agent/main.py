@@ -26,13 +26,20 @@ from a2a.server.apps import A2AStarletteApplication
 from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.tasks import InMemoryTaskStore
 from a2a.types import AgentCard
-import click
+
+# Optional imports for local development
+try:
+    import uvicorn
+    import click
+except ImportError:
+    uvicorn = None
+    click = None
+
 from dotenv import load_dotenv
 from starlette.applications import Starlette
 from starlette.responses import FileResponse
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
-import uvicorn
 
 from .agent import root_agent as business_agent
 from .agent_executor import ADKAgentExecutor
@@ -54,9 +61,6 @@ def create_app():
     
     if not card_path.exists():
         logger.error(f"Agent card not found at {card_path}")
-        # Fallback for Vercel deployment structure if needed
-        # base_path = Path("/var/task/a2a/business_agent/src/business_agent")
-        # card_path = base_path / "data" / "agent_card.json"
     
     with card_path.open(encoding="utf-8") as f:
         data = json.load(f)
@@ -105,19 +109,24 @@ def make_sync(func):
         return asyncio.run(func(*args, **kwargs))
     return wrapper
 
-@click.command()
-@click.option("--host", default="0.0.0.0")
-@click.option("--port", default=10999)
-@make_sync
-async def run(host, port):
-    """Run the A2A business agent server locally."""
-    if not os.getenv("GOOGLE_API_KEY"):
-        logger.error("GOOGLE_API_KEY must be set")
-        exit(1)
+# Only define CLI if click is available
+if click and uvicorn:
+    @click.command()
+    @click.option("--host", default="0.0.0.0")
+    @click.option("--port", default=10999)
+    @make_sync
+    async def run(host, port):
+        """Run the A2A business agent server locally."""
+        if not os.getenv("GOOGLE_API_KEY"):
+            logger.error("GOOGLE_API_KEY must be set")
+            exit(1)
 
-    config = uvicorn.Config(app, host=host, port=port, log_level="info")
-    server = uvicorn.Server(config)
-    await server.serve()
+        config = uvicorn.Config(app, host=host, port=port, log_level="info")
+        server = uvicorn.Server(config)
+        await server.serve()
 
 if __name__ == "__main__":
-    run()
+    if click and uvicorn:
+        run()
+    else:
+        print("Click or Uvicorn not installed. Cannot run locally.")
