@@ -129,14 +129,20 @@ class RetailStore:
         self._db_token = os.getenv("TURSO_AUTH_TOKEN")
         self._db_client = None
         
+        print(f"DEBUG: Initializing DB with URL: {self._db_url}")
+        
         if self._db_url:
             try:
                 self._db_client = libsql_client.create_client_sync(url=self._db_url, auth_token=self._db_token)
                 self._db_client.execute("CREATE TABLE IF NOT EXISTS agent_checkouts (id TEXT PRIMARY KEY, data TEXT)")
                 self._db_client.execute("CREATE TABLE IF NOT EXISTS agent_orders (id TEXT PRIMARY KEY, data TEXT)")
                 logger.info(f"Turso DB initialized for Business Agent at {self._db_url}")
+                print("DEBUG: Turso DB successfully connected and tables verified.")
             except Exception as e:
                 logger.error(f"Failed to initialize Turso DB: {e}")
+                print(f"DEBUG: Turso DB Error: {e}")
+        else:
+            print("DEBUG: No TURSO_URL found in environment variables.")
 
     def _save_checkout_to_db(self, checkout: Checkout):
         if self._db_client:
@@ -529,6 +535,7 @@ class RetailStore:
 
         self._recalculate_checkout(checkout)
         self._checkouts[checkout_id] = checkout
+        self._save_checkout_to_db(checkout)
 
         return checkout
 
@@ -595,6 +602,8 @@ class RetailStore:
             self._sync_scapi_totals(checkout, basket_data)
 
         self._checkouts[checkout_id] = checkout
+        self._save_checkout_to_db(checkout)
+
         logger.info(
             f"UCP checkout updated with discount: code={coupon_code}, "
             f"discount_amount=${discount_amount/100:.2f}"
