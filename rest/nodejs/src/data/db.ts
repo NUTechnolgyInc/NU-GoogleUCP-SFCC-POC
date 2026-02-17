@@ -1,21 +1,36 @@
-import Database from 'better-sqlite3';
+import { createClient, type Client } from '@libsql/client';
 
-let productsDb: Database.Database | null = null;
-let transactionsDb: Database.Database | null = null;
+let productsClient: Client | null = null;
+let transactionsClient: Client | null = null;
 
 /**
- * Initializes the SQLite database connections for products and transactions.
+ * Initializes the LibSQL (Turso) database connections for products and transactions.
  * Creates the necessary tables if they do not exist.
- *
- * @param productsPath Path to the products SQLite database file.
- * @param transactionsPath Path to the transactions SQLite database file.
+ * 
+ * In Vercel, this uses environment variables:
+ * - TURSO_URL: the Turso database URL (e.g., libsql://my-db.turso.io)
+ * - TURSO_AUTH_TOKEN: the Turso auth token
  */
-export function initDbs(productsPath: string, transactionsPath: string) {
-  productsDb = new Database(productsPath);
-  transactionsDb = new Database(transactionsPath);
+export async function initDbs(productsPath: string, transactionsPath: string) {
+  // Use environment variables if available, fallback to local file paths
+  const url = process.env.TURSO_URL || `file:${productsPath}`;
+  const authToken = process.env.TURSO_AUTH_TOKEN;
+
+  console.log(`Initializing Turso DB with URL: ${url}`);
+  productsClient = createClient({
+    url: url,
+    authToken: authToken,
+  });
+
+  // For transactions, we can use the same DB or a different one. 
+  // In Turso, it's common to use one DB with multiple tables.
+  transactionsClient = createClient({
+    url: process.env.TURSO_URL || `file:${transactionsPath}`,
+    authToken: authToken,
+  });
 
   // Initialize Products DB schema
-  productsDb.exec(`
+  await productsClient.execute(`
     CREATE TABLE IF NOT EXISTS products (
       id TEXT PRIMARY KEY,
       title TEXT,
@@ -25,14 +40,14 @@ export function initDbs(productsPath: string, transactionsPath: string) {
   `);
 
   // Initialize Transactions DB schema
-  transactionsDb.exec(`
+  await transactionsClient.execute(`
     CREATE TABLE IF NOT EXISTS inventory (
       product_id TEXT PRIMARY KEY,
       quantity INTEGER DEFAULT 0
     )
   `);
 
-  transactionsDb.exec(`
+  await transactionsClient.execute(`
     CREATE TABLE IF NOT EXISTS checkouts (
       id TEXT PRIMARY KEY,
       status TEXT,
@@ -40,14 +55,14 @@ export function initDbs(productsPath: string, transactionsPath: string) {
     )
   `);
 
-  transactionsDb.exec(`
+  await transactionsClient.execute(`
     CREATE TABLE IF NOT EXISTS orders (
       id TEXT PRIMARY KEY,
       data TEXT
     )
   `);
 
-  transactionsDb.exec(`
+  await transactionsClient.execute(`
     CREATE TABLE IF NOT EXISTS request_logs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       method TEXT,
@@ -58,7 +73,7 @@ export function initDbs(productsPath: string, transactionsPath: string) {
     )
   `);
 
-  transactionsDb.exec(`
+  await transactionsClient.execute(`
     CREATE TABLE IF NOT EXISTS idempotency_keys (
       key TEXT PRIMARY KEY,
       request_hash TEXT,
@@ -69,27 +84,23 @@ export function initDbs(productsPath: string, transactionsPath: string) {
 }
 
 /**
- * Returns the initialized products database instance.
+ * Returns the initialized products database client.
  * Throws an error if initDbs has not been called.
- *
- * @returns The better-sqlite3 Database instance for products.
  */
-export function getProductsDb(): Database.Database {
-  if (!productsDb) {
-    throw new Error('Products DB not initialized. Call initDbs first.');
+export function getProductsDb(): Client {
+  if (!productsClient) {
+    throw new Error('Products DB client not initialized. Call initDbs first.');
   }
-  return productsDb;
+  return productsClient;
 }
 
 /**
- * Returns the initialized transactions database instance.
+ * Returns the initialized transactions database client.
  * Throws an error if initDbs has not been called.
- *
- * @returns The better-sqlite3 Database instance for transactions.
  */
-export function getTransactionsDb(): Database.Database {
-  if (!transactionsDb) {
-    throw new Error('Transactions DB not initialized. Call initDbs first.');
+export function getTransactionsDb(): Client {
+  if (!transactionsClient) {
+    throw new Error('Transactions DB client not initialized. Call initDbs first.');
   }
-  return transactionsDb;
+  return transactionsClient;
 }

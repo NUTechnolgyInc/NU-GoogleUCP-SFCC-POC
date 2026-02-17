@@ -1,0 +1,9 @@
+pydantic[email]>=2.12.3
+google-adk[a2a]>=1.22.0
+uvicorn>=0.35.0
+httpx>=0.28.1
+ucp-sdk==0.1.0
+python-dotenv>=1.0.0
+libsql-client>=0.1.0
+click>=8.1.7
+starlette>=0.35.1

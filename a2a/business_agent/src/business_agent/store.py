@@ -24,6 +24,8 @@ import sys
 from typing import Optional
 from uuid import uuid4
 from pydantic import AnyUrl
+import libsql_client
+
 # UCP: All checkout models come from the ucp_sdk package
 from ucp_sdk.models.schemas.shopping.checkout_resp import (
     CheckoutResponse as Checkout,
@@ -110,6 +112,7 @@ class RetailStore:
         
         self._initialize_ucp_metadata()
         self._initialize_products()
+        self._initialize_db()
         
         # Initialize SCAPI configuration check
         if self._use_scapi:
@@ -119,6 +122,57 @@ class RetailStore:
             except Exception as e:
                 logger.warning(f"Failed to initialize SCAPI client: {e}. Falling back to static products.")
                 self._use_scapi = False
+
+    def _initialize_db(self):
+        """Initialize Turso database connection."""
+        self._db_url = os.getenv("TURSO_URL")
+        self._db_token = os.getenv("TURSO_AUTH_TOKEN")
+        self._db_client = None
+        
+        if self._db_url:
+            try:
+                self._db_client = libsql_client.create_client_sync(url=self._db_url, auth_token=self._db_token)
+                self._db_client.execute("CREATE TABLE IF NOT EXISTS agent_checkouts (id TEXT PRIMARY KEY, data TEXT)")
+                self._db_client.execute("CREATE TABLE IF NOT EXISTS agent_orders (id TEXT PRIMARY KEY, data TEXT)")
+                logger.info(f"Turso DB initialized for Business Agent at {self._db_url}")
+            except Exception as e:
+                logger.error(f"Failed to initialize Turso DB: {e}")
+
+    def _save_checkout_to_db(self, checkout: Checkout):
+        if self._db_client:
+            try:
+                data_json = checkout.model_dump_json()
+                self._db_client.execute(
+                    "INSERT INTO agent_checkouts (id, data) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET data = EXCLUDED.data",
+                    (checkout.id, data_json)
+                )
+            except Exception as e:
+                logger.error(f"Failed to save checkout to Turso: {e}")
+
+    def _load_checkout_from_db(self, checkout_id: str) -> Optional[Checkout]:
+        if self._db_client:
+            try:
+                rs = self._db_client.execute("SELECT data FROM agent_checkouts WHERE id = ?", (checkout_id,))
+                if rs.rows:
+                    data = json.loads(rs.rows[0][0])
+                    # Determine checkout type
+                    from .helpers import get_checkout_type_from_data
+                    checkout_type = get_checkout_type_from_data(data)
+                    return checkout_type.model_validate(data)
+            except Exception as e:
+                logger.error(f"Failed to load checkout from Turso: {e}")
+        return None
+
+    def _save_order_to_db(self, order_id: str, checkout: Checkout):
+        if self._db_client:
+            try:
+                data_json = checkout.model_dump_json()
+                self._db_client.execute(
+                    "INSERT INTO agent_orders (id, data) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET data = EXCLUDED.data",
+                    (order_id, data_json)
+                )
+            except Exception as e:
+                logger.error(f"Failed to save order to Turso: {e}")
 
     # ── Auth Mode Management ──────────────────────────────────────────
 
@@ -709,17 +763,22 @@ class RetailStore:
             f"total=${order_total_cents/100:.2f}"
         )
 
-    def get_checkout(self, checkout_id: str) -> Checkout | None:
-        """Retrieve a Checkout by its ID.
+    def get_checkout(self, checkout_id: str) -> Optional[Checkout]:
+        """Retrieve a checkout from the store.
 
         Args:
-            checkout_id (str): ID of the checkout to retrieve
+            checkout_id (str): ID of the checkout to retrieve.
 
         Returns:
-            Checkout | None: Checkout object if found, None otherwise
+            Optional[Checkout]: The Checkout object if found, else None.
 
         """
-        return self._checkouts.get(checkout_id)
+        checkout = self._checkouts.get(checkout_id)
+        if not checkout:
+            checkout = self._load_checkout_from_db(checkout_id)
+            if checkout:
+                self._checkouts[checkout_id] = checkout
+        return checkout
 
     def remove_from_checkout(
         self, checkout_id: str, product_id: str
@@ -746,6 +805,7 @@ class RetailStore:
 
         self._recalculate_checkout(checkout)
         self._checkouts[checkout_id] = checkout
+        self._save_checkout_to_db(checkout)
         return checkout
 
     def update_checkout(
@@ -774,6 +834,7 @@ class RetailStore:
 
         self._recalculate_checkout(checkout)
         self._checkouts[checkout_id] = checkout
+        self._save_checkout_to_db(checkout)
         return checkout
 
     def _recalculate_checkout(self, checkout: Checkout) -> None:
@@ -977,6 +1038,7 @@ class RetailStore:
 
         self._recalculate_checkout(checkout)
         self._checkouts[checkout_id] = checkout
+        self._save_checkout_to_db(checkout)
         return checkout
 
     def start_payment(self, checkout_id: str) -> Checkout | str:
@@ -1012,6 +1074,7 @@ class RetailStore:
         self._recalculate_checkout(checkout)
         checkout.status = "ready_for_complete"
         self._checkouts[checkout_id] = checkout
+        self._save_checkout_to_db(checkout)
         return checkout
 
     def place_order(self, checkout_id: str) -> Checkout:
@@ -1076,8 +1139,14 @@ class RetailStore:
         )
 
         self._orders[order_id] = checkout
+        self._save_order_to_db(order_id, checkout)
         # Clear the checkout after placing the order
         del self._checkouts[checkout_id]
+        if self._db_client:
+            try:
+                self._db_client.execute("DELETE FROM agent_checkouts WHERE id = ?", (checkout_id,))
+            except Exception as e:
+                logger.error(f"Failed to delete checkout from Turso: {e}")
         return checkout
 
     def _get_fulfillment_options(self) -> list[FulfillmentOptionResponse]:

@@ -1,20 +1,28 @@
-import {serve} from '@hono/node-server';
-import {zValidator} from '@hono/zod-validator';
-import {type Context, Hono} from 'hono';
-import {requestId} from 'hono/request-id';
-import {pinoHttp} from 'pino-http';
+import { serve } from '@hono/node-server';
+import { zValidator } from '@hono/zod-validator';
+import { type Context, Hono } from 'hono';
+import { requestId } from 'hono/request-id';
+import { pinoHttp } from 'pino-http';
+import { config } from 'dotenv';
 
-import {CheckoutService, zCompleteCheckoutRequest} from './api/checkout';
-import {DiscoveryService} from './api/discovery';
-import {OrderService} from './api/order';
-import {TestingService} from './api/testing';
-import {initDbs} from './data/db';
-import {ExtendedCheckoutCreateRequestSchema, ExtendedCheckoutUpdateRequestSchema, OrderSchema,} from './models';
-import {IdParamSchema, prettyValidation} from './utils/validation';
+// Load environment variables from .env file
+config();
+
+import { CheckoutService, zCompleteCheckoutRequest } from './api/checkout';
+import { DiscoveryService } from './api/discovery';
+import { OrderService } from './api/order';
+import { TestingService } from './api/testing';
+import { initDbs } from './data/db';
+import { ExtendedCheckoutCreateRequestSchema, ExtendedCheckoutUpdateRequestSchema, OrderSchema, } from './models';
+import { IdParamSchema, prettyValidation } from './utils/validation';
 
 const app = new Hono();
 
-initDbs('databases/products.db', 'databases/transactions.db');
+// Initialize DBs (handles remote Turso or local SQLite)
+// Note: In Vercel, this runs on every cold start.
+initDbs('databases/products.db', 'databases/transactions.db').catch(err => {
+  console.error('Failed to initialize databases:', err);
+});
 
 const checkoutService = new CheckoutService();
 const orderService = new OrderService();
@@ -24,24 +32,25 @@ const testingService = new TestingService(checkoutService);
 // Setup logging for each request
 app.use(requestId());
 app.use(async (c: Context, next: () => Promise<void>) => {
-  c.env.incoming.id = c.var.requestId;
+  if (c.env?.incoming) {
+    c.env.incoming.id = c.var.requestId;
 
-  await new Promise<void>((resolve) =>
-    pinoHttp({
-      quietReqLogger: true,
-      transport: {
-        target: 'pino-http-print',
-        options: {
-          destination: 1,
-          all: true,
-          translateTime: true,
+    await new Promise<void>((resolve) =>
+      pinoHttp({
+        quietReqLogger: true,
+        transport: {
+          target: 'pino-http-print',
+          options: {
+            destination: 1,
+            all: true,
+            translateTime: true,
+          },
         },
-      },
-    })(c.env.incoming, c.env.outgoing, () => resolve()),
-  );
+      })(c.env.incoming, c.env.outgoing, () => resolve()),
+    );
 
-  c.set('logger', c.env.incoming.log);
-
+    c.set('logger', c.env.incoming.log);
+  }
   await next();
 });
 
@@ -49,16 +58,13 @@ app.use(async (c: Context, next: () => Promise<void>) => {
 app.use(async (c: Context, next: () => Promise<void>) => {
   const ucpAgent = c.req.header('UCP-Agent');
   if (ucpAgent) {
-    // Simple regex to find version="YYYY-MM-DD"
     const match = ucpAgent.match(/version="([^"]+)"/);
     if (match) {
       const clientVersion = match[1];
       const serverVersion = discoveryService.ucpVersion;
-      // Simple string comparison for now, assuming ISO dates.
-      // Ideally we'd parse and check compatibility.
       if (clientVersion > serverVersion) {
         return c.json(
-          {error: `Unsupported UCP version: ${clientVersion}`},
+          { error: `Unsupported UCP version: ${clientVersion}` },
           400,
         );
       }
@@ -114,17 +120,24 @@ app.put(
 
 /* Testing endpoints */
 app.post(
-    '/testing/simulate-shipping/:id',
-    zValidator('param', IdParamSchema, prettyValidation),
-    testingService.shipOrder,
+  '/testing/simulate-shipping/:id',
+  zValidator('param', IdParamSchema, prettyValidation),
+  testingService.shipOrder,
 );
 
-serve(
-  {
-    fetch: app.fetch,
-    port: 3000,
-  },
-  (info) => {
-    console.log(`Server is running on http://localhost:${info.port}`);
-  },
-);
+// For local development
+if (process.env.NODE_ENV !== 'production') {
+  const port = 3000;
+  serve(
+    {
+      fetch: app.fetch,
+      port: port,
+    },
+    (info) => {
+      console.log(`Server is running on http://localhost:${info.port}`);
+    },
+  );
+}
+
+// Export for Vercel
+export default app;

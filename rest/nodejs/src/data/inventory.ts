@@ -1,4 +1,4 @@
-import {getTransactionsDb} from './db';
+import { getTransactionsDb } from './db';
 
 /**
  * Retrieves the available inventory quantity for a given product.
@@ -6,13 +6,15 @@ import {getTransactionsDb} from './db';
  * @param productId The ID of the product to check.
  * @returns The quantity available, or undefined if the product is not found in inventory.
  */
-export function getInventory(productId: string): number | undefined {
+export async function getInventory(productId: string): Promise<number | undefined> {
   const db = getTransactionsDb();
-  const stmt = db.prepare(
-    'SELECT quantity FROM inventory WHERE product_id = ?',
-  );
-  const result = stmt.get(productId) as {quantity: number} | undefined;
-  return result?.quantity;
+  const rs = await db.execute({
+    sql: 'SELECT quantity FROM inventory WHERE product_id = ?',
+    args: [productId]
+  });
+
+  if (rs.rows.length === 0) return undefined;
+  return Number(rs.rows[0].quantity);
 }
 
 /**
@@ -23,18 +25,18 @@ export function getInventory(productId: string): number | undefined {
  * @param quantity The amount to reserve (decrement).
  * @returns True if the stock was successfully reserved, false if there was insufficient stock.
  */
-export function reserveStock(productId: string, quantity: number): boolean {
+export async function reserveStock(productId: string, quantity: number): Promise<boolean> {
   const db = getTransactionsDb();
-  // Use a transaction to ensure atomicity if needed, but a single update statement is atomic in SQLite.
-  // We want to decrement quantity only if we have enough.
-  const stmt = db.prepare(`
-    UPDATE inventory
-    SET quantity = quantity - ?
-    WHERE product_id = ? AND quantity >= ?
-  `);
+  const rs = await db.execute({
+    sql: `
+      UPDATE inventory
+      SET quantity = quantity - ?
+      WHERE product_id = ? AND quantity >= ?
+    `,
+    args: [quantity, productId, quantity]
+  });
 
-  const info = stmt.run(quantity, productId, quantity);
-  return info.changes > 0;
+  return rs.rowsAffected > 0;
 }
 
 /**
@@ -44,12 +46,14 @@ export function reserveStock(productId: string, quantity: number): boolean {
  * @param productId The ID of the product.
  * @param quantity The amount to release (increment).
  */
-export function releaseStock(productId: string, quantity: number): void {
+export async function releaseStock(productId: string, quantity: number): Promise<void> {
   const db = getTransactionsDb();
-  const stmt = db.prepare(`
-    UPDATE inventory
-    SET quantity = quantity + ?
-    WHERE product_id = ?
-  `);
-  stmt.run(quantity, productId);
+  await db.execute({
+    sql: `
+      UPDATE inventory
+      SET quantity = quantity + ?
+      WHERE product_id = ?
+    `,
+    args: [quantity, productId]
+  });
 }

@@ -1,6 +1,5 @@
-import {type ExtendedCheckoutResponse, type Order} from '../models';
-
-import {getTransactionsDb} from './db';
+import { type ExtendedCheckoutResponse, type Order } from '../models';
+import { getTransactionsDb } from './db';
 
 /**
  * Represents the structure of a checkout session stored in the database.
@@ -20,38 +19,28 @@ export interface IdempotencyRecord {
 
 /**
  * Saves or updates a checkout session in the database.
- * If a session with the given ID exists, it updates it; otherwise, it creates a
- * new one.
+ * If a session with the given ID exists, it updates it; otherwise, it creates a new one.
  *
  * @param checkoutId The unique identifier for the checkout session.
- * @param status The current status of the checkout (e.g., 'in_progress',
- *     'completed').
+ * @param status The current status of the checkout (e.g., 'in_progress', 'completed').
  * @param checkoutObj The full checkout object to be serialized and stored.
  */
-export function saveCheckout(
-    checkoutId: string,
-    status: string,
-    checkoutObj: ExtendedCheckoutResponse,
-    ): void {
+export async function saveCheckout(
+  checkoutId: string,
+  status: string,
+  checkoutObj: ExtendedCheckoutResponse,
+): Promise<void> {
   const db = getTransactionsDb();
-
-  // Check if exists
-  const existingStmt = db.prepare('SELECT id FROM checkouts WHERE id = ?');
-  const existing = existingStmt.get(checkoutId);
 
   const dataStr = JSON.stringify(checkoutObj);
 
-  if (existing) {
-    const updateStmt = db.prepare(
-        'UPDATE checkouts SET status = ?, data = ? WHERE id = ?',
-    );
-    updateStmt.run(status, dataStr, checkoutId);
-  } else {
-    const insertStmt = db.prepare(
-        'INSERT INTO checkouts (id, status, data) VALUES (?, ?, ?)',
-    );
-    insertStmt.run(checkoutId, status, dataStr);
-  }
+  // Using raw SQL for compatibility with @libsql/client execute()
+  await db.execute({
+    sql: `INSERT INTO checkouts (id, status, data) 
+          VALUES (?, ?, ?) 
+          ON CONFLICT(id) DO UPDATE SET status = EXCLUDED.status, data = EXCLUDED.data`,
+    args: [checkoutId, status, dataStr]
+  });
 }
 
 /**
@@ -59,19 +48,20 @@ export function saveCheckout(
  * Parses the stored JSON data into a Checkout object.
  *
  * @param checkoutId The unique identifier of the checkout session.
- * @returns The Checkout object if found and successfully parsed, otherwise
- *     undefined.
+ * @returns The Checkout object if found and successfully parsed, otherwise undefined.
  */
-export function getCheckoutSession(
-    checkoutId: string,
-    ): ExtendedCheckoutResponse|undefined {
+export async function getCheckoutSession(
+  checkoutId: string,
+): Promise<ExtendedCheckoutResponse | undefined> {
   const db = getTransactionsDb();
-  const stmt = db.prepare('SELECT data FROM checkouts WHERE id = ?');
-  const result = stmt.get(checkoutId) as {data: string} | undefined;
+  const rs = await db.execute({
+    sql: 'SELECT data FROM checkouts WHERE id = ?',
+    args: [checkoutId]
+  });
 
-  if (result) {
+  if (rs.rows.length > 0) {
     try {
-      return JSON.parse(result.data) as ExtendedCheckoutResponse;
+      return JSON.parse(rs.rows[0].data as string) as ExtendedCheckoutResponse;
     } catch (e) {
       console.error('Failed to parse checkout data', e);
       return undefined;
@@ -80,32 +70,28 @@ export function getCheckoutSession(
   return undefined;
 }
 
-export function saveOrder(orderId: string, orderObj: Order): void {
+export async function saveOrder(orderId: string, orderObj: Order): Promise<void> {
   const db = getTransactionsDb();
   const dataStr = JSON.stringify(orderObj);
 
-  const existingStmt = db.prepare('SELECT id FROM orders WHERE id = ?');
-  const existing = existingStmt.get(orderId);
-
-  if (existing) {
-    const updateStmt = db.prepare('UPDATE orders SET data = ? WHERE id = ?');
-    updateStmt.run(dataStr, orderId);
-  } else {
-    const insertStmt = db.prepare(
-        'INSERT INTO orders (id, data) VALUES (?, ?)',
-    );
-    insertStmt.run(orderId, dataStr);
-  }
+  await db.execute({
+    sql: `INSERT INTO orders (id, data) 
+          VALUES (?, ?) 
+          ON CONFLICT(id) DO UPDATE SET data = EXCLUDED.data`,
+    args: [orderId, dataStr]
+  });
 }
 
-export function getOrder(orderId: string): Order|undefined {
+export async function getOrder(orderId: string): Promise<Order | undefined> {
   const db = getTransactionsDb();
-  const stmt = db.prepare('SELECT data FROM orders WHERE id = ?');
-  const result = stmt.get(orderId) as {data: string} | undefined;
+  const rs = await db.execute({
+    sql: 'SELECT data FROM orders WHERE id = ?',
+    args: [orderId]
+  });
 
-  if (result) {
+  if (rs.rows.length > 0) {
     try {
-      return JSON.parse(result.data) as Order;
+      return JSON.parse(rs.rows[0].data as string) as Order;
     } catch (e) {
       console.error('Failed to parse order data', e);
       return undefined;
@@ -114,38 +100,48 @@ export function getOrder(orderId: string): Order|undefined {
   return undefined;
 }
 
-export function logRequest(
-    method: string,
-    url: string,
-    checkoutId: string|undefined,
-    payload: unknown,
-    ): void {
+export async function logRequest(
+  method: string,
+  url: string,
+  checkoutId: string | undefined,
+  payload: unknown,
+): Promise<void> {
   const db = getTransactionsDb();
-  const stmt = db.prepare(
-      'INSERT INTO request_logs (method, url, checkout_id, payload) VALUES (?, ?, ?, ?)',
-  );
-  stmt.run(method, url, checkoutId || null, JSON.stringify(payload));
+  await db.execute({
+    sql: 'INSERT INTO request_logs (method, url, checkout_id, payload) VALUES (?, ?, ?, ?)',
+    args: [method, url, checkoutId || null, JSON.stringify(payload)]
+  });
 }
 
-export function getIdempotencyRecord(
-    key: string,
-    ): IdempotencyRecord|undefined {
+export async function getIdempotencyRecord(
+  key: string,
+): Promise<IdempotencyRecord | undefined> {
   const db = getTransactionsDb();
-  const stmt = db.prepare(
-      'SELECT key, request_hash, response_status, response_body FROM idempotency_keys WHERE key = ?',
-  );
-  return stmt.get(key) as IdempotencyRecord | undefined;
+  const rs = await db.execute({
+    sql: 'SELECT key, request_hash, response_status, response_body FROM idempotency_keys WHERE key = ?',
+    args: [key]
+  });
+
+  if (rs.rows.length === 0) return undefined;
+
+  const row = rs.rows[0];
+  return {
+    key: row.key as string,
+    request_hash: row.request_hash as string,
+    response_status: Number(row.response_status),
+    response_body: row.response_body as string
+  };
 }
 
-export function saveIdempotencyRecord(
-    key: string,
-    requestHash: string,
-    status: number,
-    responseBody: string,
-    ): void {
+export async function saveIdempotencyRecord(
+  key: string,
+  requestHash: string,
+  status: number,
+  responseBody: string,
+): Promise<void> {
   const db = getTransactionsDb();
-  const stmt = db.prepare(
-      'INSERT OR REPLACE INTO idempotency_keys (key, request_hash, response_status, response_body) VALUES (?, ?, ?, ?)',
-  );
-  stmt.run(key, requestHash, status, responseBody);
+  await db.execute({
+    sql: 'INSERT INTO idempotency_keys (key, request_hash, response_status, response_body) VALUES (?, ?, ?, ?) ON CONFLICT(key) DO UPDATE SET request_hash = EXCLUDED.request_hash, response_status = EXCLUDED.response_status, response_body = EXCLUDED.response_body',
+    args: [key, requestHash, status, responseBody]
+  });
 }
