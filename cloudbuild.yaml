@@ -1,0 +1,22 @@
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['build', '-t', 'us-central1-docker.pkg.dev/numart-gcp-456121/nubot-ai/business-agent', '-f', 'apps/business_agent/Dockerfile', '.']
+
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  entrypoint: gcloud
+  args:
+    - 'run'
+    - 'deploy'
+    - 'business-agent'
+    - '--image'
+    - 'us-central1-docker.pkg.dev/numart-gcp-456121/nubot-ai/business-agent'
+    - '--region'
+    - 'us-central1'
+    - '--platform'
+    - 'managed'
+    - '--allow-unauthenticated'
+    - '--set-env-vars'
+    - 'GOOGLE_API_KEY=$_GOOGLE_API_KEY,TURSO_URL=$_TURSO_URL,TURSO_AUTH_TOKEN=$_TURSO_AUTH_TOKEN,HOST=$_SCAPI_HOST,ORG_ID=$_SCAPI_ORG_ID,CLIENT_ID=$_SCAPI_CLIENT_ID,CLIENT_SECRET=$_SCAPI_CLIENT_SECRET,CHANNEL_ID=$_SCAPI_CHANNEL_ID,SITE_ID=$_SCAPI_SITE_ID,USE_SCAPI=true'
+
+images:
+- 'us-central1-docker.pkg.dev/numart-gcp-456121/nubot-ai/business-agent'

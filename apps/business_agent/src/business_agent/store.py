@@ -72,23 +72,20 @@ from ucp_sdk.models.schemas.ucp import ResponseCheckout as UcpMetadata
 from .helpers import get_checkout_type
 from .models.product_types import ImageObject, Product, ProductResults
 
+DEFAULT_CURRENCY = "USD"
+logger = logging.getLogger(__name__)
+
 # Add SCAPI integration import
 try:
-    # Add scapi_integration to path
-    scapi_path = Path(__file__).parent.parent.parent.parent.parent / "scapi_integration"
-    if scapi_path.exists() and str(scapi_path) not in sys.path:
-        sys.path.insert(0, str(scapi_path.parent))
-    
     from scapi_integration import SalesforceSyncClient, SCAPIConfig
     from scapi_integration.models import get_state_code, get_country_code
     SCAPI_AVAILABLE = True
+    print("DEBUG: SCAPI integration found and imported.")
+    logger.info("SCAPI integration loaded successfully")
 except ImportError:
     SCAPI_AVAILABLE = False
-    logging.warning("SCAPI integration not available, using fallback to products.json")
-
-
-DEFAULT_CURRENCY = "USD"
-logger = logging.getLogger(__name__)
+    print("DEBUG: SCAPI integration NOT found (ImportError).")
+    logger.warning("SCAPI integration not available, using fallback to products.json")
 
 
 class RetailStore:
@@ -124,25 +121,13 @@ class RetailStore:
                 self._use_scapi = False
 
     def _initialize_db(self):
-        """Initialize Turso database connection."""
-        self._db_url = os.getenv("TURSO_URL")
-        self._db_token = os.getenv("TURSO_AUTH_TOKEN")
+        """Initialize database connection (currently in-memory only)."""
+        self._db_url = None
+        self._db_token = None
         self._db_client = None
         
-        print(f"DEBUG: Initializing DB with URL: {self._db_url}")
-        
-        if self._db_url:
-            try:
-                self._db_client = libsql_client.create_client_sync(url=self._db_url, auth_token=self._db_token)
-                self._db_client.execute("CREATE TABLE IF NOT EXISTS agent_checkouts (id TEXT PRIMARY KEY, data TEXT)")
-                self._db_client.execute("CREATE TABLE IF NOT EXISTS agent_orders (id TEXT PRIMARY KEY, data TEXT)")
-                logger.info(f"Turso DB initialized for Business Agent at {self._db_url}")
-                print("DEBUG: Turso DB successfully connected and tables verified.")
-            except Exception as e:
-                logger.error(f"Failed to initialize Turso DB: {e}")
-                print(f"DEBUG: Turso DB Error: {e}")
-        else:
-            print("DEBUG: No TURSO_URL found in environment variables.")
+        logger.info("Store initialized in IN-MEMORY mode (Turso disabled).")
+        print("DEBUG: Using In-Memory storage for this session.")
 
     def _save_checkout_to_db(self, checkout: Checkout):
         if self._db_client:

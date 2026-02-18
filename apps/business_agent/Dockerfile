@@ -8,17 +8,18 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements
-COPY src/business_agent/requirements.txt .
+COPY apps/business_agent/src/business_agent/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install uvicorn
 
-# Copy the source code
-COPY src/ /app/src/
+# Copy the source code and integration
+COPY apps/business_agent/src /app/src
+COPY scapi_integration /app/scapi_integration
 
-# Set Python path to find the business_agent package
-ENV PYTHONPATH=/app/src
+# Set Python path to find both packages
+ENV PYTHONPATH=/app/src:/app
 
-# Set environment variables (should also be set in Cloud Run console)
+# Set environment variables
 ENV PORT=8080
 
 EXPOSE 8080
