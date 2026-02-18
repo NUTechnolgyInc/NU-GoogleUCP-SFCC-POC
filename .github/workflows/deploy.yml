@@ -32,5 +32,6 @@ jobs:
           gcloud builds submit \
             --project ${{ secrets.GCP_PROJECT_ID }} \
             --config cloudbuild.yaml \
+            --async \
             --substitutions "_GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }},_TURSO_URL=${{ secrets.TURSO_URL }},_TURSO_AUTH_TOKEN=${{ secrets.TURSO_AUTH_TOKEN }},_SCAPI_HOST=${{ secrets.SCAPI_HOST }},_SCAPI_ORG_ID=${{ secrets.SCAPI_ORG_ID }},_SCAPI_CLIENT_ID=${{ secrets.SCAPI_CLIENT_ID }},_SCAPI_CLIENT_SECRET=${{ secrets.SCAPI_CLIENT_SECRET }},_SCAPI_CHANNEL_ID=${{ secrets.SCAPI_CHANNEL_ID }},_SCAPI_SITE_ID=${{ secrets.SCAPI_SITE_ID }}" \
             .
