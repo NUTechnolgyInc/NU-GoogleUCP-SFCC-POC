@@ -24,18 +24,13 @@ jobs:
         with:
           credentials_json: '${{ secrets.GCP_SA_KEY }}'
 
+      - name: Set up Cloud SDK
+        uses: 'google-github-actions/setup-gcloud@v2'
+
       - name: Trigger Cloud Build
-        uses: 'google-github-actions/deploy-cloudbuild@v2'
-        with:
-          project_id: ${{ secrets.GCP_PROJECT_ID }}
-          config: cloudbuild.yaml
-          substitutions: |
-            _GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }}
-            _TURSO_URL=${{ secrets.TURSO_URL }}
-            _TURSO_AUTH_TOKEN=${{ secrets.TURSO_AUTH_TOKEN }}
-            _SCAPI_HOST=${{ secrets.SCAPI_HOST }}
-            _SCAPI_ORG_ID=${{ secrets.SCAPI_ORG_ID }}
-            _SCAPI_CLIENT_ID=${{ secrets.SCAPI_CLIENT_ID }}
-            _SCAPI_CLIENT_SECRET=${{ secrets.SCAPI_CLIENT_SECRET }}
-            _SCAPI_CHANNEL_ID=${{ secrets.SCAPI_CHANNEL_ID }}
-            _SCAPI_SITE_ID=${{ secrets.SCAPI_SITE_ID }}
+        run: |
+          gcloud builds submit \
+            --project ${{ secrets.GCP_PROJECT_ID }} \
+            --config cloudbuild.yaml \
+            --substitutions "_GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }},_TURSO_URL=${{ secrets.TURSO_URL }},_TURSO_AUTH_TOKEN=${{ secrets.TURSO_AUTH_TOKEN }},_SCAPI_HOST=${{ secrets.SCAPI_HOST }},_SCAPI_ORG_ID=${{ secrets.SCAPI_ORG_ID }},_SCAPI_CLIENT_ID=${{ secrets.SCAPI_CLIENT_ID }},_SCAPI_CLIENT_SECRET=${{ secrets.SCAPI_CLIENT_SECRET }},_SCAPI_CHANNEL_ID=${{ secrets.SCAPI_CHANNEL_ID }},_SCAPI_SITE_ID=${{ secrets.SCAPI_SITE_ID }}" \
+            .
