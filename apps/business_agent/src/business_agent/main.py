@@ -65,6 +65,11 @@ def create_app():
     
     with card_path.open(encoding="utf-8") as f:
         data = json.load(f)
+    
+    # Inject dynamic BASE_URL into agent card
+    base_url = os.getenv("BASE_URL", "http://localhost:10999").rstrip("/")
+    data["url"] = base_url
+    
     agent_card = AgentCard.model_validate(data)
 
     task_store = InMemoryTaskStore()
@@ -80,6 +85,19 @@ def create_app():
     a2a_app = A2AStarletteApplication(
         agent_card=agent_card, http_handler=request_handler
     )
+
+    async def get_ucp_profile(request):
+        with open(base_path / "data" / "ucp.json", "r") as f:
+            ucp_data = json.load(f)
+        current_base_url = os.getenv("BASE_URL") or str(request.base_url).rstrip("/")
+        if "ucp" in ucp_data and "services" in ucp_data["ucp"]:
+            for service in ucp_data["ucp"]["services"].values():
+                if "a2a" in service and "endpoint" in service["a2a"]:
+                    service["a2a"]["endpoint"] = service["a2a"]["endpoint"].replace(
+                        "http://localhost:10999", current_base_url
+                    )
+        return JSONResponse(ucp_data)
+
     routes = a2a_app.routes()
     routes.extend(
         [
@@ -91,10 +109,7 @@ def create_app():
                 "/api",
                 lambda request: JSONResponse({"status": "ok", "message": "Business Agent is running (at /api)"}),
             ),
-            Route(
-                "/.well-known/ucp",
-                lambda request: FileResponse(base_path / "data" / "ucp.json"),
-            ),
+            Route("/.well-known/ucp", get_ucp_profile),
             Mount(
                 "/images",
                 app=StaticFiles(directory=str(base_path / "data" / "images")),
