@@ -11,7 +11,7 @@ steps:
     - '--image'
     - 'us-central1-docker.pkg.dev/numart-gcp-456121/nubot-ai/business-agent'
     - '--region'
-    - 'us-central1'
+    - 'asia-south1'
     - '--platform'
     - 'managed'
     - '--allow-unauthenticated'
